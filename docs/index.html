@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>To-Do Liste</title>
+  <style>
+    body {
+      font-family: Inter, system-ui, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: #f4f6fb;
+      color: #111827;
+    }
+    .container {
+      width: min(100%, 640px);
+      padding: 2rem;
+      border-radius: 24px;
+      background: #ffffff;
+      box-shadow: 0 20px 60px rgba(15, 23, 42, 0.12);
+    }
+    h1 {
+      margin: 0 0 0.5rem;
+      font-size: clamp(2rem, 2.5vw, 2.8rem);
+    }
+    p {
+      margin: 0 0 1.5rem;
+      color: #4b5563;
+    }
+    .input-group {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    .input-group input {
+      width: 100%;
+      padding: 0.95rem 1rem;
+      border: 1px solid #d1d5db;
+      border-radius: 14px;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+    .input-group input:focus {
+      border-color: #6366f1;
+    }
+    .input-group button,
+    .controls button {
+      border: none;
+      border-radius: 14px;
+      padding: 0.95rem 1.2rem;
+      background: #4f46e5;
+      color: white;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    .input-group button:hover,
+    .controls button:hover {
+      background: #4338ca;
+    }
+    .controls {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+    .tasks {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 0.75rem;
+    }
+    .task {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem 1rem;
+      border: 1px solid #e5e7eb;
+      border-radius: 18px;
+      background: #f9fafb;
+    }
+    .task.done {
+      opacity: 0.75;
+      text-decoration: line-through;
+      background: #eef2ff;
+    }
+    .task button {
+      background: #f43f5e;
+      padding: 0.65rem 0.85rem;
+    }
+    .task button:hover {
+      background: #e11d48;
+    }
+    .task__text {
+      flex: 1;
+      min-width: 0;
+    }
+    .task__actions {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .task__actions button {
+      background: #10b981;
+      padding: 0.6rem 0.85rem;
+    }
+    .task__actions button.remove {
+      background: #ef4444;
+    }
+    .empty {
+      text-align: center;
+      color: #6b7280;
+      padding: 2rem 1rem;
+      border: 1px dashed #d1d5db;
+      border-radius: 18px;
+      background: #f8fafc;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>To-Do Liste</h1>
+    <p>Ein einfaches To-Do-Board, das lokal im Browser gespeichert wird. Aufgaben können hinzugefügt, als erledigt markiert oder gelöscht werden.</p>
+
+    <div class="input-group">
+      <input id="taskInput" type="text" placeholder="Neue Aufgabe hinzufügen..." aria-label="Neue Aufgabe" />
+      <button id="addButton">Hinzufügen</button>
+    </div>
+
+    <div class="controls">
+      <button id="clearButton">Alle Aufgaben löschen</button>
+    </div>
+
+    <ul id="taskList" class="tasks"></ul>
+  </div>
+
+  <script>
+    const STORAGE_KEY = "essslinger-todo-tasks";
+    const taskInput = document.getElementById("taskInput");
+    const addButton = document.getElementById("addButton");
+    const clearButton = document.getElementById("clearButton");
+    const taskList = document.getElementById("taskList");
+
+    function loadTasks() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveTasks(tasks) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    }
+
+    function renderTasks() {
+      const tasks = loadTasks();
+      taskList.innerHTML = "";
+
+      if (tasks.length === 0) {
+        const empty = document.createElement("li");
+        empty.className = "empty";
+        empty.textContent = "Keine Aufgaben vorhanden. Füge eine neue Aufgabe hinzu, um zu beginnen.";
+        taskList.appendChild(empty);
+        return;
+      }
+
+      tasks.forEach((task, index) => {
+        const item = document.createElement("li");
+        item.className = `task${task.done ? " done" : ""}`;
+
+        const text = document.createElement("div");
+        text.className = "task__text";
+        text.textContent = task.text;
+
+        const actions = document.createElement("div");
+        actions.className = "task__actions";
+
+        const doneButton = document.createElement("button");
+        doneButton.textContent = task.done ? "Rückgängig" : "Erledigt";
+        doneButton.addEventListener("click", () => toggleDone(index));
+
+        const removeButton = document.createElement("button");
+        removeButton.className = "remove";
+        removeButton.textContent = "Löschen";
+        removeButton.addEventListener("click", () => removeTask(index));
+
+        actions.appendChild(doneButton);
+        actions.appendChild(removeButton);
+        item.appendChild(text);
+        item.appendChild(actions);
+        taskList.appendChild(item);
+      });
+    }
+
+    function addTask() {
+      const text = taskInput.value.trim();
+      if (!text) return;
+
+      const tasks = loadTasks();
+      tasks.push({ text, done: false });
+      saveTasks(tasks);
+      taskInput.value = "";
+      renderTasks();
+    }
+
+    function toggleDone(index) {
+      const tasks = loadTasks();
+      if (!tasks[index]) return;
+      tasks[index].done = !tasks[index].done;
+      saveTasks(tasks);
+      renderTasks();
+    }
+
+    function removeTask(index) {
+      const tasks = loadTasks();
+      if (!tasks[index]) return;
+      tasks.splice(index, 1);
+      saveTasks(tasks);
+      renderTasks();
+    }
+
+    function clearTasks() {
+      if (!confirm("Alle Aufgaben wirklich löschen?")) return;
+      localStorage.removeItem(STORAGE_KEY);
+      renderTasks();
+    }
+
+    addButton.addEventListener("click", addTask);
+    taskInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        addTask();
+      }
+    });
+    clearButton.addEventListener("click", clearTasks);
+
+    renderTasks();
+  </script>
+</body>
+</html>
